@@ -1,12 +1,19 @@
-FROM "node:lts-alpine"
+FROM node:14-alpine3.10 as ts-compiler
+WORKDIR /usr/app
+COPY package*.json ./
+COPY tsconfig*.json ./
+RUN npm install
+COPY . ./
+RUN npm run build
 
-WORKDIR /usr/src/app
+FROM node:14-alpine3.10 as ts-remover
+WORKDIR /usr/app
+COPY --from=ts-compiler /usr/app/package*.json ./
+COPY --from=ts-compiler /usr/app/build ./
+RUN npm install --only=production
 
-COPY package.json ./
-COPY yarn.lock ./
-
-RUN yarn install
-
-COPY ./dist /usr/src/app
-
-CMD ["node", "index.js"]
+FROM gcr.io/distroless/nodejs:14
+WORKDIR /usr/app
+COPY --from=ts-remover /usr/app ./
+USER 1000
+CMD ["index.js"]
